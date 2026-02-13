@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import PreviewPanel from "@/components/PreviewPanel";
+import DownloadButton from "@/components/DownloadButton";
 import { parseCode } from "@/lib/parseCode";
 import { Message } from "@/types";
 
@@ -30,8 +31,11 @@ export default function Home() {
           onGeneratingChange={setIsGenerating}
         />
       </div>
-      <div className="flex-1">
+      <div className="relative flex-1">
         <PreviewPanel code={currentCode} />
+        <div className="absolute top-4 right-4 z-10">
+          <DownloadButton code={currentCode} />
+        </div>
       </div>
     </main>
   );
