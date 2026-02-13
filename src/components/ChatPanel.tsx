@@ -3,10 +3,20 @@
 import { useState, useRef, useEffect } from "react";
 import { Message } from "@/types";
 
-export default function ChatPanel() {
-  const [messages, setMessages] = useState<Message[]>([]);
+interface ChatPanelProps {
+  messages: Message[];
+  onMessagesUpdate: (messages: Message[]) => void;
+  isGenerating: boolean;
+  onGeneratingChange: (generating: boolean) => void;
+}
+
+export default function ChatPanel({
+  messages,
+  onMessagesUpdate,
+  isGenerating,
+  onGeneratingChange,
+}: ChatPanelProps) {
   const [input, setInput] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -20,9 +30,9 @@ export default function ChatPanel() {
 
     const userMessage: Message = { role: "user", content: trimmed };
     const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    onMessagesUpdate(updatedMessages);
     setInput("");
-    setIsGenerating(true);
+    onGeneratingChange(true);
 
     try {
       const res = await fetch("/api/generate", {
@@ -38,34 +48,32 @@ export default function ChatPanel() {
 
       const decoder = new TextDecoder();
       let assistantContent = "";
-
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      const withAssistant = [...updatedMessages, { role: "assistant" as const, content: "" }];
+      onMessagesUpdate(withAssistant);
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         assistantContent += decoder.decode(value, { stream: true });
-        setMessages((prev) => {
-          const next = [...prev];
-          next[next.length - 1] = {
-            role: "assistant",
-            content: assistantContent,
-          };
-          return next;
-        });
+        const updated = [...withAssistant];
+        updated[updated.length - 1] = {
+          role: "assistant",
+          content: assistantContent,
+        };
+        onMessagesUpdate(updated);
       }
     } catch (error) {
       console.error("Generation failed:", error);
-      setMessages((prev) => [
-        ...prev,
+      onMessagesUpdate([
+        ...updatedMessages,
         {
           role: "assistant",
           content: "Something went wrong. Please try again.",
         },
       ]);
     } finally {
-      setIsGenerating(false);
+      onGeneratingChange(false);
     }
   }
 
