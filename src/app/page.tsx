@@ -4,6 +4,7 @@ import { useState } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import PreviewPanel from "@/components/PreviewPanel";
 import DownloadButton from "@/components/DownloadButton";
+import ShareButton from "@/components/ShareButton";
 import { parseCode } from "@/lib/parseCode";
 import { Message } from "@/types";
 
@@ -14,7 +15,7 @@ export default function Home() {
 
   function handleMessagesUpdate(msgs: Message[]) {
     setMessages(msgs);
-    const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+    const lastAssistant = [...msgs].reverse().find(function(m) { return m.role === "assistant"; });
     if (lastAssistant) {
       const code = parseCode(lastAssistant.content);
       if (code) setCurrentCode(code);
@@ -23,7 +24,6 @@ export default function Home() {
 
   return (
     <main className="flex h-screen flex-col" style={{ fontFamily: "var(--font-body)" }}>
-      {/* Header */}
       <header className="flex items-center justify-between border-b px-5 py-3"
               style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <div className="flex items-center gap-3">
@@ -43,13 +43,12 @@ export default function Home() {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <ShareButton code={currentCode} />
           <DownloadButton code={currentCode} />
         </div>
       </header>
 
-      {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Chat panel */}
         <div className="flex w-full max-w-lg flex-col border-r xl:max-w-xl"
              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
           <ChatPanel
@@ -60,7 +59,6 @@ export default function Home() {
           />
         </div>
 
-        {/* Preview panel */}
         <div className="relative flex-1">
           <PreviewPanel code={currentCode} isGenerating={isGenerating} />
         </div>
