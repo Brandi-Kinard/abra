@@ -9,6 +9,9 @@ interface ChatPanelProps {
   isGenerating: boolean;
   onGeneratingChange: (generating: boolean) => void;
   onClearPreview?: () => void;
+  currentCode?: string | null;
+  onOpenPreview?: () => void;
+  isMobile?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -27,6 +30,9 @@ export default function ChatPanel({
   isGenerating,
   onGeneratingChange,
   onClearPreview,
+  currentCode,
+  onOpenPreview,
+  isMobile,
 }: ChatPanelProps) {
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
@@ -34,7 +40,7 @@ export default function ChatPanel({
 
   useEffect(function () {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, currentCode]);
 
   async function sendMessage(text: string) {
     var trimmed = text.trim();
@@ -96,8 +102,6 @@ export default function ChatPanel({
       });
       if (res.ok) {
         setWaitlistSubmitted(true);
-      } else {
-        console.error("Waitlist signup failed");
       }
     } catch (error) {
       console.error("Waitlist error:", error);
@@ -114,18 +118,13 @@ export default function ChatPanel({
 
   function renderAssistantContent(content: string, isLastMsg: boolean) {
     var cleaned = content;
-    // Strip COMPLETE code blocks
     cleaned = cleaned.replace(/```html[\s\S]*?```/g, "");
-    // Strip INCOMPLETE code blocks (during streaming)
     cleaned = cleaned.replace(/```html[\s\S]*$/g, "");
-    // Strip any other code blocks
     cleaned = cleaned.replace(/```[\s\S]*?```/g, "");
     cleaned = cleaned.replace(/```[\s\S]*$/g, "");
     cleaned = cleaned.trim();
-    // Strip markdown formatting
     cleaned = stripMarkdown(cleaned);
 
-    // During generation with no visible text yet — show building message
     if (!cleaned && isGenerating && isLastMsg) {
       return (
         <span className="animate-gentle-pulse" style={{ color: "var(--color-text-muted)" }}>
@@ -134,17 +133,28 @@ export default function ChatPanel({
       );
     }
 
-    // Generation done but no text came through (only code) — show ready
     if (!cleaned && !isGenerating) {
       return (
         <span style={{ color: "var(--color-text-secondary)" }}>
-          ✦ Scene ready — check the preview.
+          ✦ Scene ready — tap to view.
         </span>
       );
     }
 
-    // Still generating but we have some text — show it (it's the "Setting up..." opener)
-    // Generation done and we have text — show it (it's the full description)
+    if (!isGenerating && isLastMsg) {
+      var paragraphs = cleaned.split(/\n\n+/).filter(function (p) { return p.trim().length > 0; });
+      if (paragraphs.length > 1) {
+        return paragraphs[paragraphs.length - 1].trim();
+      }
+    }
+
+    if (isGenerating && isLastMsg) {
+      var firstParagraphs = cleaned.split(/\n\n+/).filter(function (p) { return p.trim().length > 0; });
+      if (firstParagraphs.length > 0) {
+        return firstParagraphs[0].trim();
+      }
+    }
+
     return cleaned;
   }
 
@@ -157,7 +167,7 @@ export default function ChatPanel({
               key={i}
               onClick={function () { sendMessage(s); }}
               disabled={isGenerating}
-              className={"rounded-" + (compact ? "lg" : "xl") + " border px-" + (compact ? "3" : "4") + " py-" + (compact ? "2" : "3") + " text-left text-" + (compact ? "xs" : "sm") + " transition-all duration-200 hover:scale-[1.01] disabled:opacity-40 disabled:cursor-not-allowed"}
+              className={"rounded-" + (compact ? "lg" : "xl") + " border px-" + (compact ? "3" : "4") + " py-" + (compact ? "2" : "3") + " text-left text-" + (compact ? "xs" : "sm") + " transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"}
               style={{
                 borderColor: "var(--color-border)",
                 color: compact ? "var(--color-text-muted)" : "var(--color-text-secondary)",
@@ -184,19 +194,59 @@ export default function ChatPanel({
     );
   }
 
+  // Inline preview card shown in chat after generation (MOBILE ONLY)
+  function renderPreviewCard() {
+    if (!currentCode || isGenerating || !isMobile) return null;
+    return (
+      <div className="pl-7 md:pl-8 animate-fade-in-up">
+        <button
+          onClick={onOpenPreview}
+          className="w-full rounded-xl border overflow-hidden transition-all duration-200 active:scale-[0.98] hover:border-[var(--color-accent)]"
+          style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface-raised)" }}
+        >
+          <div className="relative h-36 md:h-44 w-full overflow-hidden rounded-t-xl" style={{ backgroundColor: "#1a1a2e" }}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-3xl mb-1">✦</div>
+                <p className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Tap to explore your scene</p>
+              </div>
+            </div>
+            {/* Gradient overlay at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 h-10"
+                 style={{ background: "linear-gradient(transparent, var(--color-surface-raised))" }} />
+          </div>
+          <div className="px-3 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 rounded-md flex items-center justify-center"
+                   style={{ background: "linear-gradient(135deg, var(--color-accent), #a855f7)" }}>
+                <span style={{ color: "white", fontSize: "9px" }}>✦</span>
+              </div>
+              <span className="text-xs font-medium" style={{ color: "var(--color-text-primary)" }}>
+                Scene ready
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: "var(--color-accent-soft)", color: "var(--color-accent)" }}>
+              Tap to view
+            </span>
+          </div>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
-      {/* Scrollable chat area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center gap-6 px-4 pt-8">
+          <div className="flex flex-col items-center gap-5 px-2 md:px-4 pt-6 md:pt-8">
             <div className="text-center">
-              <div className="mb-2 text-3xl">✦</div>
-              <h2 className="text-lg font-semibold tracking-tight"
+              <div className="mb-2 text-2xl md:text-3xl">✦</div>
+              <h2 className="text-base md:text-lg font-semibold tracking-tight"
                   style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
                 What will you create?
               </h2>
-              <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              <p className="mt-1 text-xs md:text-sm" style={{ color: "var(--color-text-secondary)" }}>
                 Pick a scene to generate an immersive 3D experience.
               </p>
             </div>
@@ -209,12 +259,12 @@ export default function ChatPanel({
               return (
                 <div key={i} className={"flex animate-fade-in-up " + (msg.role === "user" ? "justify-end" : "justify-start")}>
                   {msg.role === "assistant" && (
-                    <div className="mr-2 mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md"
+                    <div className="mr-2 mt-1 flex h-5 w-5 md:h-6 md:w-6 flex-shrink-0 items-center justify-center rounded-md"
                          style={{ background: "linear-gradient(135deg, var(--color-accent), #a855f7)" }}>
-                      <span style={{ color: "white", fontSize: "11px", lineHeight: 1 }}>✦</span>
+                      <span style={{ color: "white", fontSize: "10px", lineHeight: 1 }}>✦</span>
                     </div>
                   )}
-                  <div className={"max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed " + (msg.role === "user" ? "rounded-br-md" : "rounded-bl-md")}
+                  <div className={"max-w-[85%] rounded-2xl px-3 py-2.5 md:px-4 md:py-3 text-xs md:text-sm leading-relaxed " + (msg.role === "user" ? "rounded-br-md" : "rounded-bl-md")}
                        style={msg.role === "user"
                          ? { backgroundColor: "var(--color-user-bubble)", color: "#fff" }
                          : { backgroundColor: "var(--color-surface-raised)", color: "var(--color-text-primary)" }}>
@@ -227,15 +277,18 @@ export default function ChatPanel({
             })}
 
             {isGenerating && messages[messages.length - 1]?.role === "assistant" && (
-              <div className="flex items-center gap-1 pl-8" style={{ color: "var(--color-text-muted)" }}>
+              <div className="flex items-center gap-1 pl-7 md:pl-8" style={{ color: "var(--color-text-muted)" }}>
                 <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--color-accent)" }} />
                 <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--color-accent)" }} />
                 <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--color-accent)" }} />
               </div>
             )}
 
+            {/* Inline preview card */}
+            {renderPreviewCard()}
+
             {!isGenerating && messages.length > 0 && (
-              <div className="pt-3 pl-8">
+              <div className="pt-3 pl-7 md:pl-8">
                 <p className="text-xs mb-2" style={{ color: "var(--color-text-muted)" }}>Try another scene</p>
                 {renderSuggestionChips(true)}
               </div>
@@ -245,15 +298,14 @@ export default function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Persistent footer — always visible */}
-      <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: "var(--color-border)" }}>
-        {/* Waitlist */}
+      {/* Persistent footer */}
+      <div className="shrink-0 border-t px-3 py-2.5 md:px-4 md:py-3 space-y-2.5 md:space-y-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
         <div>
-          <p className="text-center text-xs mb-2" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-center text-[10px] md:text-xs mb-1.5 md:mb-2" style={{ color: "var(--color-text-muted)" }}>
             Custom scene descriptions and more scenes coming soon
           </p>
           {waitlistSubmitted ? (
-            <p className="text-center text-xs" style={{ color: "var(--color-success)" }}>
+            <p className="text-center text-[10px] md:text-xs" style={{ color: "var(--color-success)" }}>
               ✓ You&apos;re on the list!
             </p>
           ) : (
@@ -273,7 +325,7 @@ export default function ChatPanel({
               />
               <button
                 onClick={handleWaitlist}
-                className="rounded-lg px-4 py-2 text-xs font-medium text-white transition-all duration-200 hover:opacity-90"
+                className="rounded-lg px-3 md:px-4 py-2 text-xs font-medium text-white transition-all duration-200 active:scale-95"
                 style={{ background: "linear-gradient(135deg, var(--color-accent), #a855f7)" }}
               >
                 Join waitlist
@@ -282,8 +334,7 @@ export default function ChatPanel({
           )}
         </div>
 
-        {/* Attribution + LinkedIn */}
-        <div className="flex items-center justify-center gap-2 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+        <div className="flex items-center justify-center gap-2 text-[10px] md:text-[11px]" style={{ color: "var(--color-text-muted)" }}>
           <span>
             Made by{" "}
             <a href="https://www.linkedin.com/in/brandi-kinard/"
