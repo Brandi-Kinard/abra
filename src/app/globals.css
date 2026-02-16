@@ -19,7 +19,6 @@
   --font-mono: "JetBrains Mono", monospace;
 }
 
-/* Base reset */
 html, body {
   background-color: var(--color-surface);
   color: var(--color-text-primary);
@@ -28,38 +27,23 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-border-active);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border-active); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
 
-/* Glow effect for branding */
 .glow-text {
   text-shadow: 0 0 30px var(--color-accent-glow), 0 0 60px var(--color-accent-glow);
 }
 
-/* Typing indicator animation */
 @keyframes blink {
   0%, 100% { opacity: 0.2; }
   50% { opacity: 1; }
 }
-.typing-dot {
-  animation: blink 1.4s infinite both;
-}
+.typing-dot { animation: blink 1.4s infinite both; }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
-/* Subtle gradient mesh for preview empty state */
 @keyframes meshShift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -70,25 +54,24 @@ html, body {
   animation: meshShift 20s ease infinite;
 }
 
-/* Input focus ring */
 .input-glow:focus {
   box-shadow: 0 0 0 2px var(--color-accent-soft), 0 0 20px var(--color-accent-glow);
 }
 
-/* Fade-in for messages */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-in-up {
-  animation: fadeInUp 0.3s ease-out both;
-}
+.animate-fade-in-up { animation: fadeInUp 0.3s ease-out both; }
 
-/* Pulse for generating state */
 @keyframes gentlePulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
-.animate-gentle-pulse {
-  animation: gentlePulse 2s ease-in-out infinite;
+.animate-gentle-pulse { animation: gentlePulse 2s ease-in-out infinite; }
+
+@keyframes slowSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
+.animate-slow-spin { animation: slowSpin 12s linear infinite; }

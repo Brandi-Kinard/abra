@@ -15,11 +15,15 @@ export default function Home() {
 
   function handleMessagesUpdate(msgs: Message[]) {
     setMessages(msgs);
-    const lastAssistant = [...msgs].reverse().find(function(m) { return m.role === "assistant"; });
+    const lastAssistant = [...msgs].reverse().find(function (m) { return m.role === "assistant"; });
     if (lastAssistant) {
       const code = parseCode(lastAssistant.content);
       if (code) setCurrentCode(code);
     }
+  }
+
+  function handleClearPreview() {
+    setCurrentCode(null);
   }
 
   return (
@@ -29,9 +33,7 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg"
                style={{ background: "linear-gradient(135deg, var(--color-accent), #a855f7)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-            </svg>
+            <span style={{ color: "white", fontSize: "16px", lineHeight: 1 }}>✦</span>
           </div>
           <h1 className="text-base font-semibold tracking-tight"
               style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
@@ -39,7 +41,7 @@ export default function Home() {
           </h1>
           <span className="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest"
                 style={{ backgroundColor: "var(--color-accent-soft)", color: "var(--color-accent)" }}>
-            Beta
+            Alpha
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -56,6 +58,7 @@ export default function Home() {
             onMessagesUpdate={handleMessagesUpdate}
             isGenerating={isGenerating}
             onGeneratingChange={setIsGenerating}
+            onClearPreview={handleClearPreview}
           />
         </div>
 
