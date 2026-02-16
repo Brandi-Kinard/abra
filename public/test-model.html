@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+</head>
+<body>
+  <a-scene renderer="colorManagement: true" background="color: #87CEEB">
+    <a-light type="ambient" intensity="1.0"></a-light>
+    <a-light type="directional" intensity="1.0" position="0 3 2"></a-light>
+    <a-light type="hemisphere" color="#ffffbb" groundColor="#080820" intensity="0.8"></a-light>
+    
+    <a-gltf-model id="test" src="/models/pirate/palm-detailed-bend.glb" position="-3 0 -5" scale="3 3 3"></a-gltf-model>
+    <a-gltf-model src="/models/pirate/rocks-a.glb" position="0 0 -5" scale="3 3 3"></a-gltf-model>
+    <a-gltf-model src="/models/pirate/ship-pirate-large.glb" position="4 0 -8" scale="2 2 2"></a-gltf-model>
+    <a-gltf-model src="/models/pirate/chest.glb" position="0 0 -3" scale="3 3 3"></a-gltf-model>
+    <a-gltf-model src="/models/nature/tree_oak.glb" position="-6 0 -5" scale="3 3 3"></a-gltf-model>
+    
+    <a-plane position="0 0 0" rotation="-90 0 0" width="30" height="30" color="#c2b280"></a-plane>
+    <a-entity position="0 1.6 0"><a-camera></a-camera></a-entity>
+  </a-scene>
+  <script>
+    document.querySelector('#test').addEventListener('model-loaded', function(e) {
+      var mesh = this.getObject3D('mesh');
+      mesh.traverse(function(node) {
+        if (node.isMesh) {
+          console.log('Material type:', node.material.type);
+          console.log('Material color:', node.material.color);
+          console.log('Vertex colors:', node.geometry.attributes.color ? 'YES' : 'NO');
+          console.log('Map:', node.material.map ? 'YES' : 'NO');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

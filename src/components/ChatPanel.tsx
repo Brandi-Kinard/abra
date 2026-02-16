@@ -11,10 +11,11 @@ interface ChatPanelProps {
 }
 
 const SUGGESTIONS = [
-  "A floating island with glowing crystals and a waterfall",
+  "A pirate cove with a ship, treasure chest, and watchtower",
   "A solar system I can walk through",
-  "An underwater coral reef with swimming fish",
-  "A neon cyberpunk cityscape at night",
+  "A forest campsite with a tent, campfire, and surrounding trees",
+  "A medieval castle courtyard with towers, flags, and a catapult",
+  "A space outpost with rockets, rovers, and asteroid debris",
 ];
 
 export default function ChatPanel({
