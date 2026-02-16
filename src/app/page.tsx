@@ -66,9 +66,7 @@ export default function Home() {
           </span>
         </div>
         <div className="flex items-center gap-1.5 md:gap-2">
-          {!mobile && <ShareButton code={currentCode} />}
           {!mobile && <DownloadButton code={currentCode} />}
-          {mobile && <ShareButton code={currentCode} />}
         </div>
       </header>
 
@@ -92,6 +90,12 @@ export default function Home() {
             </div>
             <div className="relative flex-1">
               <PreviewPanel code={currentCode} isGenerating={isGenerating} isMobile={false} />
+              {/* Share button overlaid on desktop preview */}
+              {currentCode && !isGenerating && (
+                <div className="absolute top-3 right-3 z-10">
+                  <ShareButton code={currentCode} />
+                </div>
+              )}
             </div>
           </>
         ) : (
