@@ -86,10 +86,22 @@ export default function ChatPanel({
     }
   }
 
-  function handleWaitlist() {
+  async function handleWaitlist() {
     if (!waitlistEmail.trim()) return;
-    console.log("Waitlist signup:", waitlistEmail);
-    setWaitlistSubmitted(true);
+    try {
+      var res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: waitlistEmail.trim() }),
+      });
+      if (res.ok) {
+        setWaitlistSubmitted(true);
+      } else {
+        console.error("Waitlist signup failed");
+      }
+    } catch (error) {
+      console.error("Waitlist error:", error);
+    }
   }
 
   function stripMarkdown(text: string): string {
