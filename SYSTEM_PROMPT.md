@@ -294,23 +294,18 @@ These models work across multiple scene types:
       scene.addEventListener('enter-vr', function () {
         if (!this.is('ar-mode')) return;
         var content = document.getElementById('scene-content');
-        var arRoot = document.getElementById('ar-root');
         var sky = document.getElementById('sky');
         var ground = document.getElementById('ground');
         // Scale down for table-top AR (20:1 — a 10m scene becomes 50cm)
         if (content) content.setAttribute('scale', '0.05 0.05 0.05');
-        // Hide until user taps a surface — ar-hit-test sets visible on placement
-        if (arRoot) arRoot.object3D.visible = false;
         if (sky) sky.setAttribute('visible', false);
         if (ground) ground.setAttribute('visible', false);
       });
       scene.addEventListener('exit-vr', function () {
         var content = document.getElementById('scene-content');
-        var arRoot = document.getElementById('ar-root');
         var sky = document.getElementById('sky');
         var ground = document.getElementById('ground');
         if (content) content.setAttribute('scale', '1 1 1');
-        if (arRoot) arRoot.object3D.visible = true;
         if (sky) sky.setAttribute('visible', true);
         if (ground) ground.setAttribute('visible', true);
       });
@@ -554,8 +549,19 @@ AFRAME.registerComponent('laser-shooter', {
       }
       moveLaser();
     }
-    scene.canvas.addEventListener('click', fireLaser);
-    scene.canvas.addEventListener('touchstart', function(e) { e.preventDefault(); fireLaser(); }, {passive: false});
+    function bindEvents() {
+      if (scene.canvas) {
+        scene.canvas.addEventListener('click', fireLaser);
+        scene.canvas.addEventListener('touchstart', function(e) { e.preventDefault(); fireLaser(); }, {passive: false});
+      }
+      // WebXR select for Vision Pro gaze+pinch and other XR controllers
+      scene.addEventListener('enter-vr', function() {
+        var session = scene.renderer.xr.getSession();
+        if (session) session.addEventListener('select', fireLaser);
+      });
+    }
+    if (scene.hasLoaded) { bindEvents(); }
+    else { scene.addEventListener('loaded', bindEvents); }
   }
 });
 </script>

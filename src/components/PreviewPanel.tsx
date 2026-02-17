@@ -105,7 +105,6 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       '      var sk=document.getElementById("sky");\n' +
       '      var gd=document.getElementById("ground");\n' +
       '      if(ct)ct.setAttribute("scale","0.05 0.05 0.05");\n' +
-      '      if(rt)rt.object3D.visible=false;\n' +
       '      if(sk)sk.setAttribute("visible",false);\n' +
       '      if(gd)gd.setAttribute("visible",false);\n' +
       '    });\n' +
@@ -115,7 +114,6 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       '      var sk=document.getElementById("sky");\n' +
       '      var gd=document.getElementById("ground");\n' +
       '      if(ct)ct.setAttribute("scale","1 1 1");\n' +
-      '      if(rt)rt.object3D.visible=true;\n' +
       '      if(sk)sk.setAttribute("visible",true);\n' +
       '      if(gd)gd.setAttribute("visible",true);\n' +
       '    });\n' +
@@ -169,7 +167,10 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       '      var { USDZExporter } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/USDZExporter.js");\n' +
       '      var scene = document.querySelector("a-scene");\n' +
       '      var exporter = new USDZExporter();\n' +
-      '      var buffer = await exporter.parse(scene.object3D);\n' +
+      '      var exportScene = scene.object3D.clone(true);\n' +
+      '      exportScene.scale.set(0.1, 0.1, 0.1);\n' +
+      '      exportScene.updateMatrixWorld(true);\n' +
+      '      var buffer = await exporter.parse(exportScene);\n' +
       '      var blob = new Blob([buffer], { type: "model/vnd.usdz+zip" });\n' +
       '      var url = URL.createObjectURL(blob);\n' +
       '      var a = document.createElement("a");\n' +
@@ -304,7 +305,7 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       )}
 
       {isMobile && !inXR && (
-        <div className="absolute bottom-[76px] left-1/2 -translate-x-1/2 z-10 flex gap-2">
+        <div className="absolute bottom-[80px] left-1/2 -translate-x-1/2 z-10 flex gap-2">
           {[
             { dir: "left", label: "←" },
             { dir: "forward", label: "↑" },

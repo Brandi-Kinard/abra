@@ -27,7 +27,7 @@ function injectEnhancements(html: string): string {
 <style>
 #dpad-wrap {
   position: fixed !important;
-  bottom: 76px !important;
+  bottom: 80px !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
   z-index: 999999 !important;
@@ -189,7 +189,6 @@ function injectEnhancements(html: string): string {
       var sky = document.getElementById('sky');
       var ground = document.getElementById('ground');
       if (content) content.setAttribute('scale', '0.05 0.05 0.05');
-      if (arRoot) arRoot.object3D.visible = false;
       if (sky) sky.setAttribute('visible', false);
       if (ground) ground.setAttribute('visible', false);
     });
@@ -206,7 +205,6 @@ function injectEnhancements(html: string): string {
       var sky = document.getElementById('sky');
       var ground = document.getElementById('ground');
       if (content) content.setAttribute('scale', '1 1 1');
-      if (arRoot) arRoot.object3D.visible = true;
       if (sky) sky.setAttribute('visible', true);
       if (ground) ground.setAttribute('visible', true);
     });
@@ -256,7 +254,10 @@ function injectEnhancements(html: string): string {
       var { USDZExporter } = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/USDZExporter.js');
       var scene = document.querySelector('a-scene');
       var exporter = new USDZExporter();
-      var buffer = await exporter.parse(scene.object3D);
+      var exportScene = scene.object3D.clone(true);
+      exportScene.scale.set(0.1, 0.1, 0.1);
+      exportScene.updateMatrixWorld(true);
+      var buffer = await exporter.parse(exportScene);
       var blob = new Blob([buffer], { type: 'model/vnd.usdz+zip' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');

@@ -25,7 +25,18 @@ export default function ShareButton({ code }: ShareButtonProps) {
       const data = await res.json();
       const fullUrl = window.location.origin + data.url;
 
-      await navigator.clipboard.writeText(fullUrl);
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+      } catch {
+        var ta = document.createElement("textarea");
+        ta.value = fullUrl;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
       setCopied(true);
       setTimeout(function () { setCopied(false); }, 2000);
     } catch (error) {
