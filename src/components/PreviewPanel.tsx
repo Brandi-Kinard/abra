@@ -43,7 +43,7 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       return;
     }
 
-    var injected = injectXRMode(injectARPlacement(injectQuickLookAR(injectMoveListener(displayCode))));
+    var injected = injectBaseHref(injectXRMode(injectARPlacement(injectQuickLookAR(injectMoveListener(displayCode)))));
     var blob = new Blob([injected], { type: "text/html" });
     var url = URL.createObjectURL(blob);
 
@@ -69,68 +69,84 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
     result = result.replace(/\s+webxr="[^"]*"/gi, '');
     result = result.replace(/<a-scene/i,
       '<a-scene xr-mode-ui="XRMode: xr"' +
-      ' webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test, layers, dom-overlay, anchors"' +
-      ' ar-hit-test="target: #ar-root; type: map; mapSize: 0.3 0.3"');
+      ' webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test, layers, dom-overlay, anchors"');
     return result;
   }
 
-  // Inject AR surface placement: wrap content in ar-root if missing, add enter/exit handlers
+  // Inject custom AR placement component + ar-root wrapper + XR postMessage
   function injectARPlacement(html: string): string {
     var arScript = '<script>\n' +
       '(function(){\n' +
-      '  function setup(){\n' +
-      '    var scene=document.querySelector("a-scene");\n' +
-      '    if(!scene)return;\n' +
-      '    if(!document.getElementById("ar-root")){\n' +
-      '      var ar=document.createElement("a-entity");\n' +
-      '      ar.id="ar-root";\n' +
-      '      var sc=document.createElement("a-entity");\n' +
-      '      sc.id="scene-content";\n' +
-      '      ar.appendChild(sc);\n' +
-      '      var mv=[];\n' +
-      '      for(var i=0;i<scene.children.length;i++){\n' +
-      '        var c=scene.children[i];\n' +
-      '        if(!c.tagName)continue;\n' +
-      '        var t=c.tagName.toLowerCase();\n' +
-      '        if(t==="a-sky"||c.id==="rig"||c.id==="sky"||t==="a-assets"||t==="canvas")continue;\n' +
-      '        mv.push(c);\n' +
+      '  if(typeof AFRAME!=="undefined"&&!AFRAME.components["ar-place"]){\n' +
+      '    AFRAME.registerComponent("ar-place",{\n' +
+      '      init:function(){this.placed=false;this.hitTestSource=null;this.reticle=null;\n' +
+      '        var self=this,scene=this.el;\n' +
+      '        scene.addEventListener("enter-vr",function(){if(!scene.is("ar-mode"))return;self.startAR();});\n' +
+      '        scene.addEventListener("exit-vr",function(){self.stopAR();});\n' +
+      '      },\n' +
+      '      startAR:function(){\n' +
+      '        var scene=this.el;this.placed=false;\n' +
+      '        var ct=document.getElementById("scene-content"),rt=document.getElementById("ar-root");\n' +
+      '        var sk=document.getElementById("sky"),gd=document.getElementById("ground");\n' +
+      '        if(ct)ct.setAttribute("scale","0.2 0.2 0.2");\n' +
+      '        if(sk)sk.setAttribute("visible",false);if(gd)gd.setAttribute("visible",false);\n' +
+      '        if(rt)rt.object3D.visible=false;\n' +
+      '        this.reticle=document.createElement("a-entity");\n' +
+      '        this.reticle.setAttribute("geometry","primitive:ring;radiusInner:0.08;radiusOuter:0.1");\n' +
+      '        this.reticle.setAttribute("material","color:white;shader:flat;opacity:0.8");\n' +
+      '        this.reticle.setAttribute("rotation","-90 0 0");this.reticle.object3D.visible=false;\n' +
+      '        scene.appendChild(this.reticle);var self=this;\n' +
+      '        var session=scene.renderer.xr.getSession();if(!session)return;\n' +
+      '        session.requestReferenceSpace("viewer").then(function(vs){\n' +
+      '          return session.requestHitTestSource({space:vs});\n' +
+      '        }).then(function(src){self.hitTestSource=src;})\n' +
+      '        .catch(function(){if(rt)rt.object3D.visible=true;});\n' +
+      '        session.addEventListener("select",function onSel(){\n' +
+      '          if(self.placed)return;self.placed=true;session.removeEventListener("select",onSel);\n' +
+      '          if(rt&&self.reticle&&self.reticle.object3D.visible){\n' +
+      '            var p=self.reticle.object3D.position;rt.object3D.position.set(p.x,p.y,p.z);}\n' +
+      '          if(rt)rt.object3D.visible=true;\n' +
+      '          if(self.reticle&&self.reticle.parentNode){self.reticle.parentNode.removeChild(self.reticle);self.reticle=null;}\n' +
+      '          if(self.hitTestSource){self.hitTestSource.cancel();self.hitTestSource=null;}\n' +
+      '        });\n' +
+      '      },\n' +
+      '      stopAR:function(){\n' +
+      '        var ct=document.getElementById("scene-content"),rt=document.getElementById("ar-root");\n' +
+      '        var sk=document.getElementById("sky"),gd=document.getElementById("ground");\n' +
+      '        if(ct)ct.setAttribute("scale","1 1 1");\n' +
+      '        if(rt){rt.object3D.visible=true;rt.object3D.position.set(0,0,0);}\n' +
+      '        if(sk)sk.setAttribute("visible",true);if(gd)gd.setAttribute("visible",true);\n' +
+      '        if(this.reticle&&this.reticle.parentNode){this.reticle.parentNode.removeChild(this.reticle);this.reticle=null;}\n' +
+      '        if(this.hitTestSource){this.hitTestSource.cancel();this.hitTestSource=null;}\n' +
+      '        this.placed=false;\n' +
+      '      },\n' +
+      '      tick:function(){\n' +
+      '        if(this.placed||!this.hitTestSource||!this.reticle)return;\n' +
+      '        var frame=this.el.frame;if(!frame)return;\n' +
+      '        var ref=this.el.renderer.xr.getReferenceSpace();if(!ref)return;\n' +
+      '        try{var r=frame.getHitTestResults(this.hitTestSource);\n' +
+      '          if(r.length>0){var pose=r[0].getPose(ref);if(pose){\n' +
+      '            this.reticle.object3D.visible=true;var p=pose.transform.position;\n' +
+      '            this.reticle.object3D.position.set(p.x,p.y,p.z);\n' +
+      '          }}\n' +
+      '        }catch(e){}\n' +
       '      }\n' +
-      '      for(var j=0;j<mv.length;j++)sc.appendChild(mv[j]);\n' +
-      '      scene.insertBefore(ar,scene.firstChild);\n' +
-      '    }\n' +
-      '    scene.addEventListener("enter-vr",function(){\n' +
-      '      if(!scene.is("ar-mode"))return;\n' +
-      '      var ct=document.getElementById("scene-content");\n' +
-      '      var rt=document.getElementById("ar-root");\n' +
-      '      var sk=document.getElementById("sky");\n' +
-      '      var gd=document.getElementById("ground");\n' +
-      '      if(ct)ct.setAttribute("scale","0.05 0.05 0.05");\n' +
-      '      if(sk)sk.setAttribute("visible",false);\n' +
-      '      if(gd)gd.setAttribute("visible",false);\n' +
-      '      var xrS=scene.renderer.xr.getSession();\n' +
-      '      if(xrS){xrS.addEventListener("select",function onP(){\n' +
-      '        xrS.removeEventListener("select",onP);\n' +
-      '        setTimeout(function(){scene.removeAttribute("ar-hit-test");},100);\n' +
-      '      });}\n' +
-      '    });\n' +
-      '    scene.addEventListener("exit-vr",function(){\n' +
-      '      var ct=document.getElementById("scene-content");\n' +
-      '      var rt=document.getElementById("ar-root");\n' +
-      '      var sk=document.getElementById("sky");\n' +
-      '      var gd=document.getElementById("ground");\n' +
-      '      if(ct)ct.setAttribute("scale","1 1 1");\n' +
-      '      if(sk)sk.setAttribute("visible",true);\n' +
-      '      if(gd)gd.setAttribute("visible",true);\n' +
-      '    });\n' +
-      '    scene.addEventListener("enter-vr",function(){\n' +
-      '      window.parent.postMessage({type:"xr-enter"},"*");\n' +
-      '    });\n' +
-      '    scene.addEventListener("exit-vr",function(){\n' +
-      '      window.parent.postMessage({type:"xr-exit"},"*");\n' +
       '    });\n' +
       '  }\n' +
-      '  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup);\n' +
-      '  else setup();\n' +
+      '  function setup(){\n' +
+      '    var scene=document.querySelector("a-scene");if(!scene)return;\n' +
+      '    if(!document.getElementById("ar-root")){\n' +
+      '      var ar=document.createElement("a-entity");ar.id="ar-root";\n' +
+      '      var sc=document.createElement("a-entity");sc.id="scene-content";ar.appendChild(sc);\n' +
+      '      var mv=[];for(var i=0;i<scene.children.length;i++){\n' +
+      '        var c=scene.children[i];if(!c.tagName)continue;var t=c.tagName.toLowerCase();\n' +
+      '        if(t==="a-sky"||c.id==="rig"||c.id==="sky"||t==="a-assets"||t==="canvas")continue;mv.push(c);}\n' +
+      '      for(var j=0;j<mv.length;j++)sc.appendChild(mv[j]);scene.insertBefore(ar,scene.firstChild);}\n' +
+      '    scene.setAttribute("ar-place","");\n' +
+      '    scene.addEventListener("enter-vr",function(){window.parent.postMessage({type:"xr-enter"},"*");});\n' +
+      '    scene.addEventListener("exit-vr",function(){window.parent.postMessage({type:"xr-exit"},"*");});\n' +
+      '  }\n' +
+      '  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup);else setup();\n' +
       '})();\n' +
       '</script>';
     return html.replace('</body>', arScript + '\n</body>');
@@ -177,6 +193,11 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       '        exportGroup.add(child.clone(true));\n' +
       '      });\n' +
       '      exportGroup.scale.set(0.05, 0.05, 0.05);\n' +
+      '      var toRm=[];\n' +
+      '      exportGroup.traverse(function(o){if(!o.isMesh)return;var g=o.geometry;if(!g||!g.parameters)return;\n' +
+      '        if((g.type==="PlaneGeometry"||g.type==="PlaneBufferGeometry")&&(g.parameters.width>10||g.parameters.height>10))toRm.push(o);\n' +
+      '        if((g.type==="SphereGeometry"||g.type==="SphereBufferGeometry")&&g.parameters.radius>50)toRm.push(o);});\n' +
+      '      toRm.forEach(function(o){if(o.parent)o.parent.remove(o);});\n' +
       '      var exportWrapper = new THREE.Scene();\n' +
       '      exportWrapper.add(exportGroup);\n' +
       '      exportWrapper.updateMatrixWorld(true);\n' +
@@ -203,6 +224,11 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
     var result = html.replace('</head>', importmap + '\n' + css + '\n</head>');
     result = result.replace('</body>', arScript + '\n</body>');
     return result;
+  }
+
+  // Inject <base href> so relative paths (/models/...) resolve against the app origin
+  function injectBaseHref(html: string): string {
+    return html.replace('<head>', '<head>\n<base href="' + window.location.origin + '/">');
   }
 
   // Inject a postMessage listener into the scene HTML so we can control movement from React

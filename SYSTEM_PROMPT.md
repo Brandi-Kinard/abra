@@ -252,7 +252,7 @@ These models work across multiple scene types:
            xr-mode-ui="XRMode: xr"
            webxr="requiredFeatures: local-floor;
                   optionalFeatures: hand-tracking, hit-test, layers, dom-overlay, anchors"
-           ar-hit-test="target: #ar-root; type: map; mapSize: 0.3 0.3">
+>
 
     <!-- ===== AR Placement Root (direct child of scene) ===== -->
     <a-entity id="ar-root">
@@ -287,47 +287,17 @@ These models work across multiple scene types:
     <a-sky id="sky" color="[sky-color]"></a-sky>
   </a-scene>
 
-  <script>
-    // AR mode: scale scene for table-top, hide sky/ground, let ar-hit-test place it
-    (function () {
-      var scene = document.querySelector('a-scene');
-      scene.addEventListener('enter-vr', function () {
-        if (!this.is('ar-mode')) return;
-        var content = document.getElementById('scene-content');
-        var sky = document.getElementById('sky');
-        var ground = document.getElementById('ground');
-        // Scale down for table-top AR (20:1 — a 10m scene becomes 50cm)
-        if (content) content.setAttribute('scale', '0.05 0.05 0.05');
-        if (sky) sky.setAttribute('visible', false);
-        if (ground) ground.setAttribute('visible', false);
-        // After first tap, remove ar-hit-test so scene stays anchored
-        var xrSession = scene.renderer.xr.getSession();
-        if (xrSession) {
-          xrSession.addEventListener('select', function onPlace() {
-            xrSession.removeEventListener('select', onPlace);
-            setTimeout(function() { scene.removeAttribute('ar-hit-test'); }, 100);
-          });
-        }
-      });
-      scene.addEventListener('exit-vr', function () {
-        var content = document.getElementById('scene-content');
-        var sky = document.getElementById('sky');
-        var ground = document.getElementById('ground');
-        if (content) content.setAttribute('scale', '1 1 1');
-        if (sky) sky.setAttribute('visible', true);
-        if (ground) ground.setAttribute('visible', true);
-      });
-    })();
-  </script>
+  <!-- AR placement is injected automatically by the preview and share pipelines.
+       No inline AR script needed in the template. -->
 </body>
 </html>
 ```
 
-Every scene MUST have: `renderer="colorManagement: true; alpha: true"` on the a-scene, lighting (ambient + directional with shadows), ground plane with `id="ground"` and `shadow="receive: true"`, sky with `id="sky"` and intentional color, camera with gaze cursor, fog matching sky color, WebXR config with `hit-test` and `anchors` in optionalFeatures, and the AR mode script. Omit `<a-assets>` if no external assets.
+Every scene MUST have: `renderer="colorManagement: true; alpha: true"` on the a-scene, lighting (ambient + directional with shadows), ground plane with `id="ground"` and `shadow="receive: true"`, sky with `id="sky"` and intentional color, camera with gaze cursor, fog matching sky color, and WebXR config with `hit-test` and `anchors` in optionalFeatures. Omit `<a-assets>` if no external assets. Do NOT include an inline AR script — AR placement is injected automatically by the preview and share pipelines.
 
 **AR scene structure**: ALL scene content (lights, ground, objects, models) MUST be placed inside `<a-entity id="scene-content">` which is inside `<a-entity id="ar-root">`. The camera rig (`id="rig"`) and sky (`id="sky"`) stay OUTSIDE `ar-root` as direct children of `<a-scene>`. This structure enables ar-hit-test to place the scene on a real-world surface in AR mode. Do NOT place content outside the `scene-content` wrapper (except camera and sky). Do NOT nest additional wrappers between `ar-root` and `scene-content`.
 
-**AR mode**: On Android Chrome (ARCore devices), A-Frame shows an "AR" button alongside the VR button. When tapped: (1) the scene scales down to table-top size (0.05 = 20:1 ratio), (2) a reticle appears on detected surfaces, (3) the user taps to place the scene on a surface. The `ar-hit-test` component targets `#ar-root` and handles the placement automatically. All scenes work in both VR and AR from the same file. IMPORTANT: Always include `id="sky"`, `id="ground"`, `id="ar-root"`, and `id="scene-content"` on those elements.
+**AR mode**: On Android Chrome (ARCore devices), A-Frame shows an "AR" button alongside the VR button. When tapped: (1) the scene scales to table-top size (0.2 = 5:1 ratio), (2) a reticle appears on detected surfaces, (3) the user taps to place the scene, and the reticle disappears. A custom `ar-place` component handles placement using the WebXR Hit Test API directly — do NOT add `ar-hit-test` to the scene tag. The component is injected automatically by the preview and share pipelines. All scenes work in both VR and AR from the same file. IMPORTANT: Always include `id="sky"`, `id="ground"`, `id="ar-root"`, and `id="scene-content"` on those elements.
 
 **iOS AR (Quick Look)**: On iPhone/iPad where WebXR AR is unavailable, a "View in AR" button is automatically injected at runtime. It exports the Three.js scene to USDZ format and opens iOS Quick Look for surface-anchored AR. No changes to generated scene templates are needed — the injection is handled by the preview and share pipelines.
 

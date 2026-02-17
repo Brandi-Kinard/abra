@@ -15,8 +15,7 @@ function injectXRMode(html: string): string {
   // Add all XR attributes
   result = result.replace(/<a-scene/i,
     '<a-scene xr-mode-ui="XRMode: xr"' +
-    ' webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test, layers, dom-overlay, anchors"' +
-    ' ar-hit-test="target: #ar-root; type: map; mapSize: 0.3 0.3"');
+    ' webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test, layers, dom-overlay, anchors"');
   return result;
 }
 
@@ -150,6 +149,91 @@ function injectEnhancements(html: string): string {
     });
   }
 
+  // ---- Custom AR placement component (replaces ar-hit-test) ----
+  if (typeof AFRAME !== 'undefined' && !AFRAME.components['ar-place']) {
+    AFRAME.registerComponent('ar-place', {
+      init: function() {
+        this.placed = false; this.hitTestSource = null; this.reticle = null;
+        var self = this; var scene = this.el;
+        scene.addEventListener('enter-vr', function() {
+          var dpad = document.getElementById('dpad-wrap');
+          if (dpad) dpad.classList.add('dpad-hidden');
+          if (!scene.is('ar-mode')) return;
+          self.startAR();
+        });
+        scene.addEventListener('exit-vr', function() { self.stopAR(); });
+      },
+      startAR: function() {
+        var scene = this.el; this.placed = false;
+        var ct = document.getElementById('scene-content');
+        var rt = document.getElementById('ar-root');
+        var sk = document.getElementById('sky');
+        var gd = document.getElementById('ground');
+        if (ct) ct.setAttribute('scale', '0.2 0.2 0.2');
+        if (sk) sk.setAttribute('visible', false);
+        if (gd) gd.setAttribute('visible', false);
+        if (rt) rt.object3D.visible = false;
+        this.reticle = document.createElement('a-entity');
+        this.reticle.setAttribute('geometry', 'primitive: ring; radiusInner: 0.08; radiusOuter: 0.1');
+        this.reticle.setAttribute('material', 'color: white; shader: flat; opacity: 0.8');
+        this.reticle.setAttribute('rotation', '-90 0 0');
+        this.reticle.object3D.visible = false;
+        scene.appendChild(this.reticle);
+        var self = this;
+        var session = scene.renderer.xr.getSession();
+        if (!session) return;
+        session.requestReferenceSpace('viewer').then(function(vs) {
+          return session.requestHitTestSource({space: vs});
+        }).then(function(src) { self.hitTestSource = src; })
+        .catch(function() { if (rt) rt.object3D.visible = true; });
+        session.addEventListener('select', function onSel() {
+          if (self.placed) return; self.placed = true;
+          session.removeEventListener('select', onSel);
+          if (rt && self.reticle && self.reticle.object3D.visible) {
+            var p = self.reticle.object3D.position;
+            rt.object3D.position.set(p.x, p.y, p.z);
+          }
+          if (rt) rt.object3D.visible = true;
+          if (self.reticle && self.reticle.parentNode) { self.reticle.parentNode.removeChild(self.reticle); self.reticle = null; }
+          if (self.hitTestSource) { self.hitTestSource.cancel(); self.hitTestSource = null; }
+        });
+      },
+      stopAR: function() {
+        var ct = document.getElementById('scene-content');
+        var rt = document.getElementById('ar-root');
+        var sk = document.getElementById('sky');
+        var gd = document.getElementById('ground');
+        var dpad = document.getElementById('dpad-wrap');
+        if (ct) ct.setAttribute('scale', '1 1 1');
+        if (rt) { rt.object3D.visible = true; rt.object3D.position.set(0,0,0); }
+        if (sk) sk.setAttribute('visible', true);
+        if (gd) gd.setAttribute('visible', true);
+        if (dpad) { var ht = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0); if (ht) dpad.classList.remove('dpad-hidden'); }
+        if (this.reticle && this.reticle.parentNode) { this.reticle.parentNode.removeChild(this.reticle); this.reticle = null; }
+        if (this.hitTestSource) { this.hitTestSource.cancel(); this.hitTestSource = null; }
+        this.placed = false;
+      },
+      tick: function() {
+        if (this.placed || !this.hitTestSource || !this.reticle) return;
+        var frame = this.el.frame;
+        if (!frame) return;
+        var ref = this.el.renderer.xr.getReferenceSpace();
+        if (!ref) return;
+        try {
+          var results = frame.getHitTestResults(this.hitTestSource);
+          if (results.length > 0) {
+            var pose = results[0].getPose(ref);
+            if (pose) {
+              this.reticle.object3D.visible = true;
+              var p = pose.transform.position;
+              this.reticle.object3D.position.set(p.x, p.y, p.z);
+            }
+          }
+        } catch(e) {}
+      }
+    });
+  }
+
   // ---- AR surface placement setup ----
   function setupAR() {
     var scene = document.querySelector('a-scene');
@@ -162,7 +246,6 @@ function injectEnhancements(html: string): string {
       var sceneContent = document.createElement('a-entity');
       sceneContent.id = 'scene-content';
       arRoot.appendChild(sceneContent);
-      // Move all scene children except sky, camera rig, assets into wrapper
       var toMove = [];
       for (var i = 0; i < scene.children.length; i++) {
         var child = scene.children[i];
@@ -178,44 +261,8 @@ function injectEnhancements(html: string): string {
       scene.insertBefore(arRoot, scene.firstChild);
     }
 
-    scene.addEventListener('enter-vr', function() {
-      // Hide D-pad in any immersive mode (AR or VR)
-      var dpad = document.getElementById('dpad-wrap');
-      if (dpad) dpad.classList.add('dpad-hidden');
-      // AR-specific: scale down for table-top, hide sky/ground
-      if (!scene.is('ar-mode')) return;
-      var content = document.getElementById('scene-content');
-      var arRoot = document.getElementById('ar-root');
-      var sky = document.getElementById('sky');
-      var ground = document.getElementById('ground');
-      if (content) content.setAttribute('scale', '0.05 0.05 0.05');
-      if (sky) sky.setAttribute('visible', false);
-      if (ground) ground.setAttribute('visible', false);
-      // After first tap, remove ar-hit-test so scene stays anchored in place
-      var xrSession = scene.renderer.xr.getSession();
-      if (xrSession) {
-        xrSession.addEventListener('select', function onPlace() {
-          xrSession.removeEventListener('select', onPlace);
-          setTimeout(function() { scene.removeAttribute('ar-hit-test'); }, 100);
-        });
-      }
-    });
-    scene.addEventListener('exit-vr', function() {
-      // Restore D-pad on exit
-      var dpad = document.getElementById('dpad-wrap');
-      if (dpad) {
-        var hasTouchScreen = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        if (hasTouchScreen) dpad.classList.remove('dpad-hidden');
-      }
-      // Restore AR state
-      var content = document.getElementById('scene-content');
-      var arRoot = document.getElementById('ar-root');
-      var sky = document.getElementById('sky');
-      var ground = document.getElementById('ground');
-      if (content) content.setAttribute('scale', '1 1 1');
-      if (sky) sky.setAttribute('visible', true);
-      if (ground) ground.setAttribute('visible', true);
-    });
+    // Add custom AR placement component
+    scene.setAttribute('ar-place', '');
   }
 
   // ---- Wait for scene to be ready ----
@@ -267,6 +314,16 @@ function injectEnhancements(html: string): string {
         exportGroup.add(child.clone(true));
       });
       exportGroup.scale.set(0.05, 0.05, 0.05);
+      // Remove ground plane and sky from export
+      var toRemove = [];
+      exportGroup.traverse(function(obj) {
+        if (!obj.isMesh) return;
+        var geo = obj.geometry;
+        if (!geo || !geo.parameters) return;
+        if ((geo.type === 'PlaneGeometry' || geo.type === 'PlaneBufferGeometry') && (geo.parameters.width > 10 || geo.parameters.height > 10)) toRemove.push(obj);
+        if ((geo.type === 'SphereGeometry' || geo.type === 'SphereBufferGeometry') && geo.parameters.radius > 50) toRemove.push(obj);
+      });
+      toRemove.forEach(function(obj) { if (obj.parent) obj.parent.remove(obj); });
       var exportWrapper = new THREE.Scene();
       exportWrapper.add(exportGroup);
       exportWrapper.updateMatrixWorld(true);
