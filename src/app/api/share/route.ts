@@ -3,14 +3,20 @@ import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 
 function injectXRMode(html: string): string {
-  // Ensure a-scene has XRMode: xr so A-Frame creates both VR and AR buttons
   var result = html;
   // Remove old vr-mode-ui attribute (superseded by xr-mode-ui in A-Frame 1.6+)
   result = result.replace(/\s+vr-mode-ui="[^"]*"/gi, '');
   // Remove any existing xr-mode-ui to avoid duplicates
   result = result.replace(/\s+xr-mode-ui="[^"]*"/gi, '');
-  // Add xr-mode-ui with XRMode: xr
-  result = result.replace(/<a-scene/i, '<a-scene xr-mode-ui="XRMode: xr"');
+  // Remove any existing ar-hit-test to avoid duplicates
+  result = result.replace(/\s+ar-hit-test="[^"]*"/gi, '');
+  // Remove any existing webxr to ensure anchors is included
+  result = result.replace(/\s+webxr="[^"]*"/gi, '');
+  // Add all XR attributes
+  result = result.replace(/<a-scene/i,
+    '<a-scene xr-mode-ui="XRMode: xr"' +
+    ' webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test, layers, dom-overlay, anchors"' +
+    ' ar-hit-test="target: #ar-root; type: map; mapSize: 0.3 0.3"');
   return result;
 }
 
@@ -21,8 +27,9 @@ function injectEnhancements(html: string): string {
 <style>
 #dpad-wrap {
   position: fixed !important;
-  bottom: 24px !important;
-  left: 16px !important;
+  bottom: 76px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
   z-index: 999999 !important;
   display: flex !important;
   gap: 8px !important;
@@ -55,6 +62,14 @@ function injectEnhancements(html: string): string {
 #dpad-wrap .dp:active {
   background: rgba(100,100,255,0.6) !important;
   border-color: rgba(100,100,255,0.9) !important;
+}
+#ios-ar-btn {
+  position: fixed; bottom: 16px; right: 16px; z-index: 999999;
+  display: none;
+  padding: 10px 16px; border-radius: 8px;
+  background: rgba(0,0,0,0.7); color: white; font-size: 14px;
+  border: 1px solid rgba(255,255,255,0.3);
+  backdrop-filter: blur(6px); cursor: pointer;
 }
 </style>`;
 
@@ -135,25 +150,65 @@ function injectEnhancements(html: string): string {
     });
   }
 
-  // ---- AR mode: hide sky and make ground transparent ----
+  // ---- AR surface placement setup ----
   function setupAR() {
     var scene = document.querySelector('a-scene');
     if (!scene) return;
-    scene.addEventListener('enter-vr', function() {
-      if (scene.is('ar-mode')) {
-        var sky = document.getElementById('sky');
-        var ground = document.getElementById('ground');
-        if (sky) sky.setAttribute('visible', false);
-        if (ground) ground.setAttribute('material', 'opacity', 0.2);
-        var dpad = document.getElementById('dpad-wrap');
-        if (dpad) dpad.classList.add('dpad-hidden');
+
+    // If scene lacks ar-root wrapper (old template), create it dynamically
+    if (!document.getElementById('ar-root')) {
+      var arRoot = document.createElement('a-entity');
+      arRoot.id = 'ar-root';
+      var sceneContent = document.createElement('a-entity');
+      sceneContent.id = 'scene-content';
+      arRoot.appendChild(sceneContent);
+      // Move all scene children except sky, camera rig, assets into wrapper
+      var toMove = [];
+      for (var i = 0; i < scene.children.length; i++) {
+        var child = scene.children[i];
+        if (!child.tagName) continue;
+        var tag = child.tagName.toLowerCase();
+        if (tag === 'a-sky' || child.id === 'rig' || child.id === 'sky' ||
+            tag === 'a-assets' || tag === 'canvas') continue;
+        toMove.push(child);
       }
-    });
-    scene.addEventListener('exit-vr', function() {
+      for (var j = 0; j < toMove.length; j++) {
+        sceneContent.appendChild(toMove[j]);
+      }
+      scene.insertBefore(arRoot, scene.firstChild);
+    }
+
+    scene.addEventListener('enter-vr', function() {
+      // Hide D-pad in any immersive mode (AR or VR)
+      var dpad = document.getElementById('dpad-wrap');
+      if (dpad) dpad.classList.add('dpad-hidden');
+      // AR-specific: scale down for table-top, hide sky/ground
+      if (!scene.is('ar-mode')) return;
+      var content = document.getElementById('scene-content');
+      var arRoot = document.getElementById('ar-root');
       var sky = document.getElementById('sky');
       var ground = document.getElementById('ground');
+      if (content) content.setAttribute('scale', '0.05 0.05 0.05');
+      if (arRoot) arRoot.object3D.visible = false;
+      if (sky) sky.setAttribute('visible', false);
+      if (ground) ground.setAttribute('visible', false);
+    });
+    scene.addEventListener('exit-vr', function() {
+      // Restore D-pad on exit
+      var dpad = document.getElementById('dpad-wrap');
+      if (dpad) {
+        var hasTouchScreen = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        if (hasTouchScreen) dpad.classList.remove('dpad-hidden');
+      }
+      // Restore AR state
+      var content = document.getElementById('scene-content');
+      var arRoot = document.getElementById('ar-root');
+      var sky = document.getElementById('sky');
+      var ground = document.getElementById('ground');
+      if (content) content.setAttribute('scale', '1 1 1');
+      if (arRoot) arRoot.object3D.visible = true;
       if (sky) sky.setAttribute('visible', true);
-      if (ground) ground.setAttribute('material', 'opacity', 1);
+      if (ground) ground.setAttribute('visible', true);
     });
   }
 
@@ -175,26 +230,72 @@ function injectEnhancements(html: string): string {
 })();
 </script>`;
 
+  var importmap = '<script type="importmap">\n' +
+    '{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}\n' +
+    '</script>';
+
+  var iosARButton = `
+<button id="ios-ar-btn">View in AR</button>
+<script type="module">
+(async function(){
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!isIOS) return;
+  var hasAR = false;
+  if (navigator.xr && navigator.xr.isSessionSupported) {
+    try { hasAR = await navigator.xr.isSessionSupported('immersive-ar'); } catch(e) {}
+  }
+  if (hasAR) return;
+  var btn = document.getElementById('ios-ar-btn');
+  if (btn) btn.style.display = 'block';
+  btn.addEventListener('click', async function() {
+    btn.textContent = 'Preparing AR\\u2026';
+    btn.disabled = true;
+    try {
+      var { USDZExporter } = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/USDZExporter.js');
+      var scene = document.querySelector('a-scene');
+      var exporter = new USDZExporter();
+      var buffer = await exporter.parse(scene.object3D);
+      var blob = new Blob([buffer], { type: 'model/vnd.usdz+zip' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.rel = 'ar';
+      a.href = url;
+      var img = document.createElement('img');
+      a.appendChild(img);
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+    } catch(e) {
+      console.error('AR export failed:', e);
+      btn.textContent = 'AR unavailable';
+    }
+    btn.textContent = 'View in AR';
+    btn.disabled = false;
+  });
+})();
+</script>`;
+
   var result = injectXRMode(html);
 
-  // Inject CSS into <head>
+  // Inject importmap + CSS into <head>
   var headClose = result.toLowerCase().indexOf('</head>');
   if (headClose !== -1) {
-    result = result.slice(0, headClose) + css + '\n' + result.slice(headClose);
+    result = result.slice(0, headClose) + importmap + '\n' + css + '\n' + result.slice(headClose);
   } else {
-    result = css + '\n' + result;
+    result = importmap + '\n' + css + '\n' + result;
   }
 
-  // Inject D-pad and scripts before </body>
+  // Inject D-pad, iOS AR button, and scripts before </body>
   var bodyClose = result.toLowerCase().lastIndexOf('</body>');
   if (bodyClose !== -1) {
-    result = result.slice(0, bodyClose) + dpadAndScripts + '\n' + result.slice(bodyClose);
+    result = result.slice(0, bodyClose) + dpadAndScripts + '\n' + iosARButton + '\n' + result.slice(bodyClose);
   } else {
     var htmlClose = result.toLowerCase().lastIndexOf('</html>');
     if (htmlClose !== -1) {
-      result = result.slice(0, htmlClose) + dpadAndScripts + '\n' + result.slice(htmlClose);
+      result = result.slice(0, htmlClose) + dpadAndScripts + '\n' + iosARButton + '\n' + result.slice(htmlClose);
     } else {
-      result = result + dpadAndScripts;
+      result = result + dpadAndScripts + '\n' + iosARButton;
     }
   }
 
