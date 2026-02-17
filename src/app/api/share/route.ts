@@ -43,7 +43,14 @@ btn.addEventListener('touchcancel',stop);
 });
 })();
 </script>`;
-  return html.replace('</body>', mobileScript + '\n</body>');
+  // Try </body> first, then </html> as fallback
+  if (html.toLowerCase().indexOf('</body>') !== -1) {
+    return html.replace(/<\/body>/i, mobileScript + '\n</body>');
+  } else if (html.toLowerCase().indexOf('</html>') !== -1) {
+    return html.replace(/<\/html>/i, mobileScript + '\n</html>');
+  }
+  // Last resort: append to end
+  return html + mobileScript;
 }
 
 export async function POST(request: Request) {

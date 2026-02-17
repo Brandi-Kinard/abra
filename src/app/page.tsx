@@ -56,11 +56,11 @@ export default function Home() {
                style={{ background: "linear-gradient(135deg, var(--color-accent), #a855f7)" }}>
             <span style={{ color: "white", fontSize: "14px", lineHeight: 1 }}>✦</span>
           </div>
-          <h1 className="text-sm md:text-base font-semibold tracking-tight"
+          <h1 className="text-base md:text-lg font-semibold tracking-tight"
               style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
             Abra
           </h1>
-          <span className="rounded-full px-1.5 py-0.5 text-[9px] md:text-[10px] font-medium uppercase tracking-widest"
+          <span className="rounded-full px-2 py-0.5 text-[10px] md:text-[11px] font-medium uppercase tracking-widest"
                 style={{ backgroundColor: "var(--color-accent-soft)", color: "var(--color-accent)" }}>
             Alpha
           </span>
@@ -151,7 +151,7 @@ export default function Home() {
           {/* Hint at bottom */}
           <div className="px-4 py-2.5 text-center border-t"
                style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-            <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               Swipe to look around · Move your phone to explore
             </p>
           </div>
