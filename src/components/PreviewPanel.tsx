@@ -11,8 +11,10 @@ interface PreviewPanelProps {
 export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPanelProps) {
   const [showScene, setShowScene] = useState(false);
   const [displayCode, setDisplayCode] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const moveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevBlobUrlRef = useRef<string | null>(null);
 
   useEffect(function () {
     if (code && code !== displayCode) {
@@ -28,6 +30,34 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       setDisplayCode(null);
     }
   }, [code, displayCode]);
+
+  // Convert HTML to blob URL for proper WebXR support
+  useEffect(function () {
+    if (!displayCode) {
+      if (prevBlobUrlRef.current) {
+        URL.revokeObjectURL(prevBlobUrlRef.current);
+        prevBlobUrlRef.current = null;
+      }
+      setBlobUrl(null);
+      return;
+    }
+
+    var injected = injectMoveListener(displayCode);
+    var blob = new Blob([injected], { type: "text/html" });
+    var url = URL.createObjectURL(blob);
+
+    // Revoke previous blob URL
+    if (prevBlobUrlRef.current) {
+      URL.revokeObjectURL(prevBlobUrlRef.current);
+    }
+    prevBlobUrlRef.current = url;
+    setBlobUrl(url);
+
+    return function () {
+      // Don't revoke here — let the next render handle it
+      // to avoid revoking while iframe is still loading
+    };
+  }, [displayCode]);
 
   // Inject a postMessage listener into the scene HTML so we can control movement from React
   function injectMoveListener(html: string): string {
@@ -114,18 +144,18 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
     );
   }
 
-  var injectedCode = injectMoveListener(displayCode);
-
   return (
     <div className="relative h-full w-full">
-      <iframe
-        ref={iframeRef}
-        srcDoc={injectedCode}
-        allow="xr-spatial-tracking; camera; gyroscope; accelerometer"
-        className="h-full w-full border-0 transition-opacity duration-300"
-        style={{ opacity: showScene ? 1 : 0, touchAction: "none" }}
-        title="A-Frame Preview"
-      />
+      {blobUrl && (
+        <iframe
+          ref={iframeRef}
+          src={blobUrl}
+          allow="xr-spatial-tracking; camera; gyroscope; accelerometer"
+          className="h-full w-full border-0 transition-opacity duration-300"
+          style={{ opacity: showScene ? 1 : 0, touchAction: "none" }}
+          title="A-Frame Preview"
+        />
+      )}
 
       {isMobile && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10 flex gap-2">

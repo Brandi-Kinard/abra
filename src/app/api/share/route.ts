@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 function injectEnhancements(html: string): string {
   // CSS goes in <head> or before </head>
+  // D-pad is display:flex by default, JS hides it on desktop
   var css = `
 <style>
 #dpad-wrap {
@@ -12,11 +13,14 @@ function injectEnhancements(html: string): string {
   left: 50% !important;
   transform: translateX(-50%) !important;
   z-index: 999999 !important;
-  display: none !important;
+  display: flex !important;
   gap: 8px !important;
   pointer-events: auto !important;
   -webkit-user-select: none !important;
   user-select: none !important;
+}
+#dpad-wrap.dpad-hidden {
+  display: none !important;
 }
 #dpad-wrap .dp {
   width: 56px !important;
@@ -41,9 +45,6 @@ function injectEnhancements(html: string): string {
   background: rgba(100,100,255,0.6) !important;
   border-color: rgba(100,100,255,0.9) !important;
 }
-@media (hover: none) and (pointer: coarse) {
-  #dpad-wrap { display: flex !important; }
-}
 </style>`;
 
   // D-pad HTML + movement script + AR mode script
@@ -56,6 +57,25 @@ function injectEnhancements(html: string): string {
 </div>
 <script>
 (function(){
+  // ---- Touch detection: hide D-pad on non-touch devices ----
+  var dpadEl = document.getElementById('dpad-wrap');
+  if (dpadEl) {
+    // Start hidden, show on first touch OR if touchscreen detected
+    dpadEl.classList.add('dpad-hidden');
+    var hasTouchScreen = ('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0) ||
+      (navigator.msMaxTouchPoints > 0);
+    if (hasTouchScreen) {
+      dpadEl.classList.remove('dpad-hidden');
+    }
+    // Fallback: show on first touch event
+    window.addEventListener('touchstart', function showDpad() {
+      dpadEl.classList.remove('dpad-hidden');
+      window.removeEventListener('touchstart', showDpad);
+    }, {once: true, passive: true});
+  }
+
+  // ---- Movement ----
   var speed = 0.15, moveInterval = null;
 
   function getRig() { return document.getElementById('rig'); }
@@ -104,7 +124,7 @@ function injectEnhancements(html: string): string {
     });
   }
 
-  // AR mode: hide sky and make ground transparent
+  // ---- AR mode: hide sky and make ground transparent ----
   function setupAR() {
     var scene = document.querySelector('a-scene');
     if (!scene) return;
@@ -114,9 +134,8 @@ function injectEnhancements(html: string): string {
         var ground = document.getElementById('ground');
         if (sky) sky.setAttribute('visible', false);
         if (ground) ground.setAttribute('material', 'opacity', 0.2);
-        // Hide D-pad in AR mode
         var dpad = document.getElementById('dpad-wrap');
-        if (dpad) dpad.style.display = 'none';
+        if (dpad) dpad.classList.add('dpad-hidden');
       }
     });
     scene.addEventListener('exit-vr', function() {
@@ -127,7 +146,7 @@ function injectEnhancements(html: string): string {
     });
   }
 
-  // Wait for scene to be ready
+  // ---- Wait for scene to be ready ----
   var sceneEl = document.querySelector('a-scene');
   if (sceneEl && sceneEl.hasLoaded) {
     initDpad(); setupAR();
@@ -152,7 +171,6 @@ function injectEnhancements(html: string): string {
   if (headClose !== -1) {
     result = result.slice(0, headClose) + css + '\n' + result.slice(headClose);
   } else {
-    // No </head>, prepend CSS
     result = css + '\n' + result;
   }
 
