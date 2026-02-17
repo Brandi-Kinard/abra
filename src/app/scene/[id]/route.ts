@@ -26,6 +26,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
+        "Permissions-Policy": "xr-spatial-tracking=(self)",
       },
     });
   } catch (e) {

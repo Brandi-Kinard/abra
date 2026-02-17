@@ -42,7 +42,7 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       return;
     }
 
-    var injected = injectMoveListener(displayCode);
+    var injected = injectXRMode(injectMoveListener(displayCode));
     var blob = new Blob([injected], { type: "text/html" });
     var url = URL.createObjectURL(blob);
 
@@ -58,6 +58,15 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       // to avoid revoking while iframe is still loading
     };
   }, [displayCode]);
+
+  // Ensure a-scene has XRMode: xr so A-Frame creates both VR and AR buttons
+  function injectXRMode(html: string): string {
+    var result = html;
+    result = result.replace(/\s+vr-mode-ui="[^"]*"/gi, '');
+    result = result.replace(/\s+xr-mode-ui="[^"]*"/gi, '');
+    result = result.replace(/<a-scene/i, '<a-scene xr-mode-ui="XRMode: xr"');
+    return result;
+  }
 
   // Inject a postMessage listener into the scene HTML so we can control movement from React
   function injectMoveListener(html: string): string {
@@ -158,7 +167,7 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       )}
 
       {isMobile && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+        <div className="absolute bottom-16 left-3 z-10 flex gap-2">
           {[
             { dir: "left", label: "←" },
             { dir: "forward", label: "↑" },

@@ -2,6 +2,18 @@ import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 
+function injectXRMode(html: string): string {
+  // Ensure a-scene has XRMode: xr so A-Frame creates both VR and AR buttons
+  var result = html;
+  // Remove old vr-mode-ui attribute (superseded by xr-mode-ui in A-Frame 1.6+)
+  result = result.replace(/\s+vr-mode-ui="[^"]*"/gi, '');
+  // Remove any existing xr-mode-ui to avoid duplicates
+  result = result.replace(/\s+xr-mode-ui="[^"]*"/gi, '');
+  // Add xr-mode-ui with XRMode: xr
+  result = result.replace(/<a-scene/i, '<a-scene xr-mode-ui="XRMode: xr"');
+  return result;
+}
+
 function injectEnhancements(html: string): string {
   // CSS goes in <head> or before </head>
   // D-pad is display:flex by default, JS hides it on desktop
@@ -10,8 +22,7 @@ function injectEnhancements(html: string): string {
 #dpad-wrap {
   position: fixed !important;
   bottom: 24px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  left: 16px !important;
   z-index: 999999 !important;
   display: flex !important;
   gap: 8px !important;
@@ -164,7 +175,7 @@ function injectEnhancements(html: string): string {
 })();
 </script>`;
 
-  var result = html;
+  var result = injectXRMode(html);
 
   // Inject CSS into <head>
   var headClose = result.toLowerCase().indexOf('</head>');

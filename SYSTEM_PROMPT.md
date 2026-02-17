@@ -249,7 +249,7 @@ These models work across multiple scene types:
   <a-scene background="color: [sky-color]" 
            fog="type: linear; color: [sky-color]; near: 20; far: 80"
            renderer="colorManagement: true; alpha: true"
-           vr-mode-ui="enabled: true"
+           xr-mode-ui="XRMode: xr"
            webxr="requiredFeatures: local-floor;
                   optionalFeatures: hand-tracking, hit-test, layers, dom-overlay"
            ar-hit-test="enabled: true">
