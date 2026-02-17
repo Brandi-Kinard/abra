@@ -1,37 +1,34 @@
 import { list } from "@vercel/blob";
+import { NextResponse } from "next/server";
 
 export async function GET(
-  req: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  var { id } = await params;
+  var pathname = "scenes/" + id + ".html";
 
   try {
-    const prefix = "scenes/" + id + ".html";
-    const { blobs } = await list({ prefix: prefix });
-
-    if (blobs.length === 0) {
-      return new Response("<h1>Scene not found</h1>", {
-        status: 404,
-        headers: { "Content-Type": "text/html" },
-      });
+    var { blobs } = await list({ prefix: pathname, limit: 1 });
+    if (!blobs.length) {
+      return new NextResponse("Scene not found", { status: 404 });
     }
 
-    const blobUrl = blobs[0].url;
-    const response = await fetch(blobUrl);
-    const html = await response.text();
+    var blobUrl = blobs[0].url;
+    var res = await fetch(blobUrl);
+    if (!res.ok) {
+      return new NextResponse("Scene not found", { status: 404 });
+    }
 
-    return new Response(html, {
+    var html = await res.text();
+
+    return new NextResponse(html, {
+      status: 200,
       headers: {
-        "Content-Type": "text/html",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Type": "text/html; charset=utf-8",
       },
     });
-  } catch (error) {
-    console.error("Scene fetch failed:", error);
-    return new Response("<h1>Error loading scene</h1>", {
-      status: 500,
-      headers: { "Content-Type": "text/html" },
-    });
+  } catch (e) {
+    return new NextResponse("Scene not found", { status: 404 });
   }
 }

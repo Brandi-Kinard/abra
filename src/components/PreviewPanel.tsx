@@ -122,6 +122,7 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
         ref={iframeRef}
         srcDoc={injectedCode}
         sandbox="allow-scripts allow-same-origin"
+        allow="xr-spatial-tracking; camera; gyroscope; accelerometer"
         className="h-full w-full border-0 transition-opacity duration-300"
         style={{ opacity: showScene ? 1 : 0, touchAction: "none" }}
         title="A-Frame Preview"
