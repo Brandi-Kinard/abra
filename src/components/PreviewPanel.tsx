@@ -154,11 +154,12 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       '  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||\n' +
       '    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);\n' +
       '  if (!isIOS) return;\n' +
-      '  var hasAR = false;\n' +
+      '  var hasXR = false;\n' +
       '  if (navigator.xr && navigator.xr.isSessionSupported) {\n' +
-      '    try { hasAR = await navigator.xr.isSessionSupported("immersive-ar"); } catch(e) {}\n' +
+      '    try { hasXR = await navigator.xr.isSessionSupported("immersive-ar"); } catch(e) {}\n' +
+      '    if (!hasXR) { try { hasXR = await navigator.xr.isSessionSupported("immersive-vr"); } catch(e) {} }\n' +
       '  }\n' +
-      '  if (hasAR) return;\n' +
+      '  if (hasXR) return;\n' +
       '  var btn = document.getElementById("ios-ar-btn");\n' +
       '  if (btn) btn.style.display = "block";\n' +
       '  btn.addEventListener("click", async function() {\n' +

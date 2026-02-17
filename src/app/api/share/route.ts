@@ -241,11 +241,12 @@ function injectEnhancements(html: string): string {
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (!isIOS) return;
-  var hasAR = false;
+  var hasXR = false;
   if (navigator.xr && navigator.xr.isSessionSupported) {
-    try { hasAR = await navigator.xr.isSessionSupported('immersive-ar'); } catch(e) {}
+    try { hasXR = await navigator.xr.isSessionSupported('immersive-ar'); } catch(e) {}
+    if (!hasXR) { try { hasXR = await navigator.xr.isSessionSupported('immersive-vr'); } catch(e) {} }
   }
-  if (hasAR) return;
+  if (hasXR) return;
   var btn = document.getElementById('ios-ar-btn');
   if (btn) btn.style.display = 'block';
   btn.addEventListener('click', async function() {
