@@ -248,10 +248,10 @@ These models work across multiple scene types:
 <body>
   <a-scene background="color: [sky-color]" 
            fog="type: linear; color: [sky-color]; near: 20; far: 80"
-           renderer="colorManagement: true"
+           renderer="colorManagement: true; alpha: true"
            vr-mode-ui="enabled: true"
            webxr="requiredFeatures: local-floor;
-                  optionalFeatures: hand-tracking, hit-test, layers"
+                  optionalFeatures: hand-tracking, hit-test, layers, dom-overlay"
            ar-hit-test="enabled: true">
 
     <!-- ===== Lighting ===== -->
@@ -262,7 +262,7 @@ These models work across multiple scene types:
     <!-- ===== Content ===== -->
 
     <!-- ===== Ground ===== -->
-    <a-plane position="0 0 0" rotation="-90 0 0" width="40" height="40"
+    <a-plane id="ground" position="0 0 0" rotation="-90 0 0" width="40" height="40"
             color="#333333" shadow="receive: true"></a-plane>
 
     <!-- ===== Camera ===== -->
@@ -277,15 +277,33 @@ These models work across multiple scene types:
       </a-camera>
     </a-entity>
 
-    <a-sky color="[sky-color]"></a-sky>
+    <a-sky id="sky" color="[sky-color]"></a-sky>
   </a-scene>
+
+  <script>
+    // AR mode: hide sky and ground so camera passthrough is visible
+    document.querySelector('a-scene').addEventListener('enter-vr', function () {
+      if (this.is('ar-mode')) {
+        var sky = document.getElementById('sky');
+        var ground = document.getElementById('ground');
+        if (sky) sky.setAttribute('visible', false);
+        if (ground) ground.setAttribute('material', 'opacity', 0.3);
+      }
+    });
+    document.querySelector('a-scene').addEventListener('exit-vr', function () {
+      var sky = document.getElementById('sky');
+      var ground = document.getElementById('ground');
+      if (sky) sky.setAttribute('visible', true);
+      if (ground) ground.setAttribute('material', 'opacity', 1);
+    });
+  </script>
 </body>
 </html>
 ```
 
-Every scene MUST have: `renderer="colorManagement: true"` on the a-scene (required for correct model colors), lighting (ambient + directional with shadows), ground plane with `shadow="receive: true"`, sky with intentional color, camera with gaze cursor, fog matching sky color, WebXR config with `hit-test` in optionalFeatures. Omit `<a-assets>` if no external assets.
+Every scene MUST have: `renderer="colorManagement: true; alpha: true"` on the a-scene (alpha: true enables transparent background for AR passthrough), lighting (ambient + directional with shadows), ground plane with `id="ground"` and `shadow="receive: true"`, sky with `id="sky"` and intentional color, camera with gaze cursor, fog matching sky color, WebXR config with `hit-test` in optionalFeatures, and the AR mode script that hides sky/ground on enter-vr when ar-mode is active. Omit `<a-assets>` if no external assets.
 
-**AR mode notes**: The `ar-hit-test` component and `hit-test` optional feature enable surface detection on Android Chrome. In AR mode, the sky and ground plane are automatically hidden by the browser — the real camera feed shows through. No code changes needed for AR vs VR; both work from the same scene file.
+**AR mode**: On Android Chrome (ARCore devices), A-Frame shows an "AR" button alongside the VR button. When tapped, the camera passthrough activates and the scene's sky and ground become transparent via the script above. The scene objects appear overlaid on the real world. The `ar-hit-test` component enables surface detection. All scenes work in both VR and AR from the same file — the script handles the mode switch automatically. IMPORTANT: Always include `id="sky"` and `id="ground"` on those elements so the AR script can find them.
 
 ---
 
@@ -435,7 +453,7 @@ Use exactly ONE treasure chest, placed on the beach at a distance from the ship 
 ### Space Battle Scenes
 This scene is ONLY: spaceships (some flying around with orbital animations), asteroids floating/drifting, stars in the sky (dark a-sky + small white spheres or particle starfield), and a few planets (primitive spheres with varied colors/sizes in the distance). Do NOT include station modules, platforms, hangars, pipes, turrets, satellite dishes, or any grounded structures. Everything floats in open space. Nothing should collide or overlap — give generous spacing between all objects.
 
-INTERACTION — Laser Shooting: Register a custom component that lets the user shoot small cyan rectangles (lasers) by clicking OR tapping (mobile). The component must listen on BOTH 'click' and 'touchstart' events on the scene canvas to ensure it works on desktop and mobile. On fire, spawn a thin box (width 0.05, height 0.05, depth 0.5) with emissive cyan material at the camera position, moving forward in the camera's look direction. When a laser intersects an asteroid (proximity check), remove the asteroid from the scene with a brief scale-down animation. Example component structure:
+INTERACTION — Laser Shooting: Register a custom component that lets the user shoot small cyan rectangles (lasers) by clicking OR tapping (mobile). The laser visually originates from the cursor/crosshair position (slightly in front of the camera) and flies forward in the camera's look direction. When a laser hits an asteroid (proximity check), the asteroid shrinks and disappears, then respawns at a new random position after a short delay. Example component structure:
 
 ```html
 <script>
@@ -445,21 +463,27 @@ AFRAME.registerComponent('laser-shooter', {
     var lastFire = 0;
     function fireLaser() {
       var now = Date.now();
-      if (now - lastFire < 300) return; // rate limit
+      if (now - lastFire < 300) return;
       lastFire = now;
       var cam = document.querySelector('[camera]');
       var pos = new THREE.Vector3();
       cam.object3D.getWorldPosition(pos);
       var dir = new THREE.Vector3(0, 0, -1);
       cam.object3D.getWorldDirection(dir);
+      // Start laser slightly in front of camera (at cursor position)
+      var startPos = {
+        x: pos.x + dir.x * 0.8,
+        y: pos.y + dir.y * 0.8,
+        z: pos.z + dir.z * 0.8
+      };
 
       var laser = document.createElement('a-box');
       laser.setAttribute('width', '0.05');
       laser.setAttribute('height', '0.05');
       laser.setAttribute('depth', '0.5');
       laser.setAttribute('material', 'color: #00ffff; emissive: #00ffff; emissiveIntensity: 1; shader: flat');
-      laser.setAttribute('position', pos.x + ' ' + pos.y + ' ' + pos.z);
-      laser.object3D.lookAt(pos.x + dir.x, pos.y + dir.y, pos.z + dir.z);
+      laser.setAttribute('position', startPos.x + ' ' + startPos.y + ' ' + startPos.z);
+      laser.object3D.lookAt(startPos.x + dir.x, startPos.y + dir.y, startPos.z + dir.z);
       scene.appendChild(laser);
 
       var speed = 30;
@@ -473,7 +497,6 @@ AFRAME.registerComponent('laser-shooter', {
           y: parseFloat(p.y) + dir.y * speed * 0.016,
           z: parseFloat(p.z) + dir.z * speed * 0.016
         });
-        // Check proximity to asteroids
         var asteroids = document.querySelectorAll('.asteroid');
         asteroids.forEach(function(ast) {
           var ap = ast.object3D.position;
@@ -481,14 +504,21 @@ AFRAME.registerComponent('laser-shooter', {
           var dist = ap.distanceTo(lp);
           if (dist < 2) {
             ast.setAttribute('animation', 'property: scale; to: 0 0 0; dur: 200');
-            setTimeout(function() { ast.parentNode && ast.parentNode.removeChild(ast); }, 250);
+            // Respawn asteroid at new random position after delay
+            setTimeout(function() {
+              var rx = (Math.random() - 0.5) * 40;
+              var ry = Math.random() * 10 + 2;
+              var rz = (Math.random() - 0.5) * 40 - 10;
+              ast.setAttribute('position', rx + ' ' + ry + ' ' + rz);
+              ast.setAttribute('scale', '1 1 1');
+              ast.removeAttribute('animation');
+            }, 2000);
           }
         });
         requestAnimationFrame(moveLaser);
       }
       moveLaser();
     }
-    // Listen for both click and touch
     scene.canvas.addEventListener('click', fireLaser);
     scene.canvas.addEventListener('touchstart', function(e) { e.preventDefault(); fireLaser(); }, {passive: false});
   }
@@ -496,7 +526,7 @@ AFRAME.registerComponent('laser-shooter', {
 </script>
 ```
 
-Add `class="asteroid"` to all asteroid entities. Add `laser-shooter` component to the scene entity (NOT the cursor). Include interaction hint: "Tap or click to shoot lasers".
+Add `class="asteroid"` to all asteroid entities. Add `laser-shooter` component to the scene entity (NOT the cursor). Include interaction hint: "Tap or click to shoot lasers". Asteroids respawn at random positions 2 seconds after being hit.
 
 ---
 

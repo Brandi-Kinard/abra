@@ -168,7 +168,7 @@ export default function ChatPanel({
   function renderSuggestionChips(compact: boolean) {
     // compact chips use text-secondary (not text-muted) for readability
     return (
-      <div className={"grid gap-" + (compact ? "2" : "2.5") + " w-full"}>
+      <div className={"grid gap-3 w-full"}>
         {SUGGESTIONS.map(function (s, i) {
           return (
             <button

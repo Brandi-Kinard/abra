@@ -2,55 +2,121 @@ import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 
-function injectMobileControls(html: string): string {
-  var mobileScript = `
+function injectEnhancements(html: string): string {
+  // Mobile D-pad controls + AR mode sky/ground hiding
+  var injection = `
 <style>
-.mobile-dpad{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:none;gap:8px;pointer-events:auto}
-.mobile-dpad button{width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,255,255,0.4);background:rgba(0,0,0,0.35);color:white;font-size:18px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:none;user-select:none;-webkit-user-select:none}
-.mobile-dpad button:active{background:rgba(100,100,255,0.5);border-color:rgba(100,100,255,0.8)}
-@media(hover:none)and(pointer:coarse){.mobile-dpad{display:flex}}
+#dpad-controls {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999999;
+  display: none;
+  gap: 8px;
+  pointer-events: auto;
+}
+#dpad-controls button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.5);
+  background: rgba(0,0,0,0.45);
+  color: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+#dpad-controls button:active {
+  background: rgba(100,100,255,0.6);
+  border-color: rgba(100,100,255,0.9);
+}
+@media (hover: none) and (pointer: coarse) {
+  #dpad-controls { display: flex !important; }
+}
 </style>
-<div class="mobile-dpad">
-<button id="ml">&larr;</button>
-<button id="mf">&uarr;</button>
-<button id="mb">&darr;</button>
-<button id="mr">&rarr;</button>
+<div id="dpad-controls">
+  <button data-dir="l">&#8592;</button>
+  <button data-dir="f">&#8593;</button>
+  <button data-dir="b">&#8595;</button>
+  <button data-dir="r">&#8594;</button>
 </div>
 <script>
 (function(){
-var rig,cam,interval=null,speed=0.15;
-function init(){rig=document.getElementById('rig');cam=document.querySelector('[camera]');}
-function move(dir){
-if(!rig||!cam)init();
-if(!rig||!cam)return;
-var r=cam.object3D.rotation,p=rig.getAttribute('position');
-if(dir==='f'){p.x-=Math.sin(r.y)*speed;p.z-=Math.cos(r.y)*speed;}
-else if(dir==='b'){p.x+=Math.sin(r.y)*speed;p.z+=Math.cos(r.y)*speed;}
-else if(dir==='l'){p.x-=Math.cos(r.y)*speed;p.z+=Math.sin(r.y)*speed;}
-else if(dir==='r'){p.x+=Math.cos(r.y)*speed;p.z-=Math.sin(r.y)*speed;}
-rig.setAttribute('position',p);
-}
-function start(dir){if(interval)return;move(dir);interval=setInterval(function(){move(dir);},33);}
-function stop(){clearInterval(interval);interval=null;}
-document.addEventListener('DOMContentLoaded',function(){
-['ml','mf','mb','mr'].forEach(function(id){
-var btn=document.getElementById(id);
-var dir=id==='mf'?'f':id==='mb'?'b':id==='ml'?'l':'r';
-btn.addEventListener('touchstart',function(e){e.preventDefault();start(dir);},{passive:false});
-btn.addEventListener('touchend',stop);
-btn.addEventListener('touchcancel',stop);
-});
-});
+  var speed = 0.15, interval = null;
+  function getRig() { return document.getElementById('rig'); }
+  function getCam() { return document.querySelector('[camera]'); }
+  function move(dir) {
+    var rig = getRig(), cam = getCam();
+    if (!rig || !cam) return;
+    var rot = cam.object3D.rotation;
+    var pos = rig.getAttribute('position');
+    var p = {x: pos.x, y: pos.y, z: pos.z};
+    if (dir === 'f') { p.x -= Math.sin(rot.y) * speed; p.z -= Math.cos(rot.y) * speed; }
+    else if (dir === 'b') { p.x += Math.sin(rot.y) * speed; p.z += Math.cos(rot.y) * speed; }
+    else if (dir === 'l') { p.x -= Math.cos(rot.y) * speed; p.z += Math.sin(rot.y) * speed; }
+    else if (dir === 'r') { p.x += Math.cos(rot.y) * speed; p.z -= Math.sin(rot.y) * speed; }
+    rig.setAttribute('position', p);
+  }
+  function startMove(dir) { if (interval) return; move(dir); interval = setInterval(function() { move(dir); }, 33); }
+  function stopMove() { clearInterval(interval); interval = null; }
+
+  function initDpad() {
+    var btns = document.querySelectorAll('#dpad-controls button');
+    btns.forEach(function(btn) {
+      var dir = btn.getAttribute('data-dir');
+      btn.addEventListener('touchstart', function(e) { e.preventDefault(); e.stopPropagation(); startMove(dir); }, {passive: false});
+      btn.addEventListener('touchend', function(e) { e.stopPropagation(); stopMove(); });
+      btn.addEventListener('touchcancel', function(e) { e.stopPropagation(); stopMove(); });
+      btn.addEventListener('mousedown', function(e) { e.stopPropagation(); startMove(dir); });
+      btn.addEventListener('mouseup', function(e) { e.stopPropagation(); stopMove(); });
+    });
+  }
+
+  // AR mode: hide sky and make ground semi-transparent
+  function setupAR() {
+    var scene = document.querySelector('a-scene');
+    if (!scene) return;
+    scene.addEventListener('enter-vr', function() {
+      if (scene.is('ar-mode')) {
+        var sky = document.getElementById('sky');
+        var ground = document.getElementById('ground');
+        if (sky) sky.setAttribute('visible', false);
+        if (ground) ground.setAttribute('material', 'opacity', 0.2);
+      }
+    });
+    scene.addEventListener('exit-vr', function() {
+      var sky = document.getElementById('sky');
+      var ground = document.getElementById('ground');
+      if (sky) sky.setAttribute('visible', true);
+      if (ground) ground.setAttribute('material', 'opacity', 1);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { initDpad(); setupAR(); });
+  } else {
+    initDpad();
+    setupAR();
+  }
 })();
 </script>`;
-  // Try </body> first, then </html> as fallback
-  if (html.toLowerCase().indexOf('</body>') !== -1) {
-    return html.replace(/<\/body>/i, mobileScript + '\n</body>');
-  } else if (html.toLowerCase().indexOf('</html>') !== -1) {
-    return html.replace(/<\/html>/i, mobileScript + '\n</html>');
+
+  // Inject before </body>, </html>, or append
+  var lower = html.toLowerCase();
+  if (lower.indexOf('</body>') !== -1) {
+    return html.replace(/<\/body>/i, injection + '\n</body>');
+  } else if (lower.indexOf('</html>') !== -1) {
+    return html.replace(/<\/html>/i, injection + '\n</html>');
   }
-  // Last resort: append to end
-  return html + mobileScript;
+  return html + injection;
 }
 
 export async function POST(request: Request) {
@@ -62,8 +128,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No HTML provided" }, { status: 400 });
     }
 
-    // Inject mobile controls before uploading
-    var enhancedHtml = injectMobileControls(html);
+    var enhancedHtml = injectEnhancements(html);
 
     var id = nanoid(10);
     var pathname = "scenes/" + id + ".html";
