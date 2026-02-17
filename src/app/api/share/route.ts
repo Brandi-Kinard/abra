@@ -191,6 +191,14 @@ function injectEnhancements(html: string): string {
       if (content) content.setAttribute('scale', '0.05 0.05 0.05');
       if (sky) sky.setAttribute('visible', false);
       if (ground) ground.setAttribute('visible', false);
+      // After first tap, remove ar-hit-test so scene stays anchored in place
+      var xrSession = scene.renderer.xr.getSession();
+      if (xrSession) {
+        xrSession.addEventListener('select', function onPlace() {
+          xrSession.removeEventListener('select', onPlace);
+          setTimeout(function() { scene.removeAttribute('ar-hit-test'); }, 100);
+        });
+      }
     });
     scene.addEventListener('exit-vr', function() {
       // Restore D-pad on exit
@@ -254,10 +262,15 @@ function injectEnhancements(html: string): string {
       var { USDZExporter } = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/USDZExporter.js');
       var scene = document.querySelector('a-scene');
       var exporter = new USDZExporter();
-      var exportScene = scene.object3D.clone(true);
-      exportScene.scale.set(0.1, 0.1, 0.1);
-      exportScene.updateMatrixWorld(true);
-      var buffer = await exporter.parse(exportScene);
+      var exportGroup = new THREE.Group();
+      scene.object3D.children.forEach(function(child) {
+        exportGroup.add(child.clone(true));
+      });
+      exportGroup.scale.set(0.05, 0.05, 0.05);
+      var exportWrapper = new THREE.Scene();
+      exportWrapper.add(exportGroup);
+      exportWrapper.updateMatrixWorld(true);
+      var buffer = await exporter.parse(exportWrapper);
       var blob = new Blob([buffer], { type: 'model/vnd.usdz+zip' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');

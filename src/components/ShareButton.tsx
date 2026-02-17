@@ -15,27 +15,42 @@ export default function ShareButton({ code }: ShareButtonProps) {
     setIsSharing(true);
 
     try {
-      const res = await fetch("/api/share", {
+      // Create the share request promise (synchronous — preserves user gesture)
+      var sharePromise = fetch("/api/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ html: code }),
+      }).then(function (res) {
+        if (!res.ok) throw new Error("Share failed");
+        return res.json();
+      }).then(function (data) {
+        return window.location.origin + data.url;
       });
 
-      if (!res.ok) throw new Error("Share failed");
-      const data = await res.json();
-      const fullUrl = window.location.origin + data.url;
-
-      try {
-        await navigator.clipboard.writeText(fullUrl);
-      } catch {
-        var ta = document.createElement("textarea");
-        ta.value = fullUrl;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
+      // Safari: ClipboardItem with Promise<Blob> preserves user gesture across async
+      if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": sharePromise.then(function (url) {
+              return new Blob([url], { type: "text/plain" });
+            }),
+          }),
+        ]);
+      } else {
+        // Fallback for browsers without ClipboardItem
+        var fullUrl = await sharePromise;
+        try {
+          await navigator.clipboard.writeText(fullUrl);
+        } catch {
+          var ta = document.createElement("textarea");
+          ta.value = fullUrl;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
       }
       setCopied(true);
       setTimeout(function () { setCopied(false); }, 2000);

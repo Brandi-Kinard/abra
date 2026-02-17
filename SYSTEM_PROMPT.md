@@ -300,6 +300,14 @@ These models work across multiple scene types:
         if (content) content.setAttribute('scale', '0.05 0.05 0.05');
         if (sky) sky.setAttribute('visible', false);
         if (ground) ground.setAttribute('visible', false);
+        // After first tap, remove ar-hit-test so scene stays anchored
+        var xrSession = scene.renderer.xr.getSession();
+        if (xrSession) {
+          xrSession.addEventListener('select', function onPlace() {
+            xrSession.removeEventListener('select', onPlace);
+            setTimeout(function() { scene.removeAttribute('ar-hit-test'); }, 100);
+          });
+        }
       });
       scene.addEventListener('exit-vr', function () {
         var content = document.getElementById('scene-content');

@@ -107,6 +107,11 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       '      if(ct)ct.setAttribute("scale","0.05 0.05 0.05");\n' +
       '      if(sk)sk.setAttribute("visible",false);\n' +
       '      if(gd)gd.setAttribute("visible",false);\n' +
+      '      var xrS=scene.renderer.xr.getSession();\n' +
+      '      if(xrS){xrS.addEventListener("select",function onP(){\n' +
+      '        xrS.removeEventListener("select",onP);\n' +
+      '        setTimeout(function(){scene.removeAttribute("ar-hit-test");},100);\n' +
+      '      });}\n' +
       '    });\n' +
       '    scene.addEventListener("exit-vr",function(){\n' +
       '      var ct=document.getElementById("scene-content");\n' +
@@ -167,10 +172,15 @@ export default function PreviewPanel({ code, isGenerating, isMobile }: PreviewPa
       '      var { USDZExporter } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/USDZExporter.js");\n' +
       '      var scene = document.querySelector("a-scene");\n' +
       '      var exporter = new USDZExporter();\n' +
-      '      var exportScene = scene.object3D.clone(true);\n' +
-      '      exportScene.scale.set(0.1, 0.1, 0.1);\n' +
-      '      exportScene.updateMatrixWorld(true);\n' +
-      '      var buffer = await exporter.parse(exportScene);\n' +
+      '      var exportGroup = new THREE.Group();\n' +
+      '      scene.object3D.children.forEach(function(child) {\n' +
+      '        exportGroup.add(child.clone(true));\n' +
+      '      });\n' +
+      '      exportGroup.scale.set(0.05, 0.05, 0.05);\n' +
+      '      var exportWrapper = new THREE.Scene();\n' +
+      '      exportWrapper.add(exportGroup);\n' +
+      '      exportWrapper.updateMatrixWorld(true);\n' +
+      '      var buffer = await exporter.parse(exportWrapper);\n' +
       '      var blob = new Blob([buffer], { type: "model/vnd.usdz+zip" });\n' +
       '      var url = URL.createObjectURL(blob);\n' +
       '      var a = document.createElement("a");\n' +
