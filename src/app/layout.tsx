@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Summon — AI Spatial Computing Engine",
+  title: "Abra — Text to XR",
   description: "Generate deployable AR/VR/MR experiences from natural language descriptions.",
 };
 
