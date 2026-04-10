@@ -4,6 +4,7 @@
 
 <!-- ADD A HERO IMAGE: screenshot of Vision Pro solar system or castle desktop scene -->
 <!-- Example: ![Abra Demo](assets/hero.png) -->
+![Abra Demo](https://github.com/user-attachments/assets/9a3a3c14-a212-458d-a7ed-d934e0fcdf17)
 
 Abra is a text-to-XR engine. Describe a scene in plain language — Abra generates a complete, interactive WebXR experience you can explore on any device. Phone. Headset. Laptop. AR. VR. Web. One URL, no app install.
 
